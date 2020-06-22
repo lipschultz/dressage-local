@@ -6,10 +6,12 @@ import pyglet
 import select_image
 
 PRODUCTION = False
-FONT_COLOR = (255, 255, 255, 127)
+FONT_COLOR_WHITE = (255, 255, 255, 127)
+FONT_COLOR_BLACK = (0, 0, 0, 127)
 FONT_COLOR_SUCCESS = (243, 229, 171, 168)
 FONT_COLOR_FAILURE = (139, 0, 0, 168)
-FONT_SIZE = 16
+FONT_SIZE = 24
+TIMER_DURATION = 7 * 60
 
 DATABASE_URL = 'dressage.sqlite'
 SOURCE_DIRECTORY = Path('images')
@@ -61,6 +63,44 @@ def is_within(x, y, obj):
     return (obj_x <= x <= obj_x + obj_width) and (obj_y <= y <= obj_y + obj_height)
 
 
+class BackgroundBox:
+    def __init__(self, foreground_object, border_width=5):
+        self.object = foreground_object
+        self.border_width = border_width
+        self.color = FONT_COLOR_BLACK
+
+    @property
+    def x(self):
+        return get_x_width(self.object)[0] - self.border_width
+
+    @property
+    def anchor_x(self):
+        return 'left'
+
+    @property
+    def y(self):
+        return get_y_height(self.object)[0] - self.border_width
+
+    @property
+    def anchor_y(self):
+        return 'bottom'
+
+    @property
+    def width(self):
+        return get_x_width(self.object)[1] + 2*self.border_width
+
+    @property
+    def height(self):
+        return get_y_height(self.object)[1] + 2*self.border_width
+
+    def draw(self):
+        box = pyglet.shapes.Rectangle(x=self.x, y=self.y, width=self.width, height=self.height, color=self.color[:3])
+        box.opacity = self.color[3]
+
+        box.draw()
+        self.object.draw()
+
+
 class Image:
     def __init__(self, filename, window):
         self.filepath = Path(filename)
@@ -90,14 +130,30 @@ class Image:
         self.sprite.draw()
 
 
-class BackgroundBox:
-    def __init__(self, foreground_object, border_width=5):
-        self.object = foreground_object
-        self.border_width = border_width
+class Rating:
+    def __init__(self, rating):
+        self.rating = rating
+        self.stars = [
+            BackgroundBox(pyglet.text.Label(
+                str(i+1),
+                font_name='Times New Roman',
+                font_size=FONT_SIZE,
+                color=FONT_COLOR_WHITE,
+                x=5, y=5,
+                anchor_x='left',
+                anchor_y='top',
+            ))
+            for i in range(5)
+        ]
 
     @property
     def x(self):
-        return get_x_width(self.object)[0] - self.border_width
+        return min(get_x_width(s)[0] for s in self.stars)
+
+    @property
+    def width(self):
+        x_plus_widths = [sum(get_x_width(s)) for s in self.stars]
+        return max(x_plus_widths) - self.x
 
     @property
     def anchor_x(self):
@@ -105,26 +161,43 @@ class BackgroundBox:
 
     @property
     def y(self):
-        return get_y_height(self.object)[0] - self.border_width
+        return min(get_y_height(s)[0] for s in self.stars)
+
+    @property
+    def height(self):
+        y_plus_heights = [sum(get_y_height(s)) for s in self.stars]
+        return max(y_plus_heights) - self.y
 
     @property
     def anchor_y(self):
         return 'bottom'
 
-    @property
-    def width(self):
-        return get_x_width(self.object)[1] + 2*self.border_width
-
-    @property
-    def height(self):
-        return get_y_height(self.object)[1] + 2*self.border_width
+    def update(self, window):
+        x_offset = 5
+        for i, star_box in enumerate(self.stars):
+            star_box.object.x = x_offset
+            x_offset += star_box.width
+            star_box.object.y = window.height - 5
+            if i + 1 <= self.rating:
+                star_box.object.color = FONT_COLOR_BLACK
+                star_box.color = FONT_COLOR_SUCCESS
+            else:
+                star_box.object.color = FONT_COLOR_WHITE
+                star_box.color = FONT_COLOR_BLACK
 
     def draw(self):
-        box = pyglet.shapes.Rectangle(x=self.x, y=self.y, width=self.width, height=self.height, color=(0, 0, 0))
-        box.opacity = 127
+        for star in self.stars:
+            star.draw()
 
-        box.draw()
-        self.object.draw()
+    def on_click(self, x, y, button, modifiers):
+        for star in self.stars:
+            if is_within(x, y, star):
+                file_reference = horse_sprite.filepath.relative_to(SOURCE_DIRECTORY)
+                rating = int(star.object.text)
+                print(f'Recording {rating} stars for {file_reference}')
+                select_image.record_rating(db, str(file_reference), rating)
+                self.rating = rating
+                break
 
 
 class Timer:
@@ -168,112 +241,55 @@ window_button = BackgroundBox(pyglet.text.Label(
     'W',
     font_name='Times New Roman',
     font_size=FONT_SIZE,
-    color=FONT_COLOR,
+    color=FONT_COLOR_WHITE,
     x=5, y=5,
-    anchor_x='left',
-    anchor_y='bottom',
+    anchor_x='right',
+    anchor_y='top',
 ))
+
+
+def update_window_button():
+    window_button.object.x = get_x_width(refresh_button)[0] - 10
+    window_button.object.y = timer_button.y - 10
+
 
 refresh_button = BackgroundBox(pyglet.text.Label(
     'R',
     font_name='Times New Roman',
     font_size=FONT_SIZE,
-    color=FONT_COLOR,
+    color=FONT_COLOR_WHITE,
     x=5, y=5,
-    anchor_x='left',
+    anchor_x='right',
     anchor_y='top',
 ))
 
 
 def pre_refresh_button_draw():
-    refresh_button.object.x = 5
-    refresh_button.object.y = window.height
-
-
-class Rating:
-    def __init__(self, rating):
-        self.rating = rating
-        self.stars = [
-            pyglet.text.Label(
-                str(i+1),
-                font_name='Times New Roman',
-                font_size=FONT_SIZE,
-                color=FONT_COLOR,
-                x=5, y=5,
-                anchor_x='right',
-                anchor_y='bottom',
-            )
-            for i in range(5)
-        ]
-
-    @property
-    def x(self):
-        return min(get_x_width(s)[0] for s in self.stars)
-
-    @property
-    def width(self):
-        x_plus_widths = [sum(get_x_width(s)) for s in self.stars]
-        return max(x_plus_widths) - self.x
-
-    @property
-    def anchor_x(self):
-        return 'left'
-
-    @property
-    def y(self):
-        return min(get_y_height(s)[0] for s in self.stars)
-
-    @property
-    def height(self):
-        y_plus_heights = [sum(get_y_height(s)) for s in self.stars]
-        return max(y_plus_heights) - self.y
-
-    @property
-    def anchor_y(self):
-        return 'bottom'
-
-    def update(self, window):
-        x_offset = window.width
-        for i in reversed(range(len(self.stars))):
-            self.stars[i].x = x_offset - 5
-            x_offset -= 5 + self.stars[i].content_width
-            self.stars[i].y = 5
-            if i + 1 <= self.rating:
-                self.stars[i].color = FONT_COLOR_SUCCESS
-            else:
-                self.stars[i].color = FONT_COLOR
-
-    def draw(self):
-        for star in self.stars:
-            star.draw()
-
-    def on_click(self, x, y, button, modifiers):
-        for star in self.stars:
-            if is_within(x, y, star):
-                file_reference = horse_sprite.filepath.relative_to(SOURCE_DIRECTORY)
-                rating = int(star.text)
-                print(f'Recording {rating} stars for {file_reference}')
-                select_image.record_rating(db, str(file_reference), rating)
-                self.rating = rating
-                break
+    refresh_button.object.x = window.width - 5
+    refresh_button.object.y = timer_button.y - 10
 
 
 def get_new_image():
     global horse_sprite
     global horse_rating
-    image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY)
-    horse_sprite = Image(SOURCE_DIRECTORY / image, window)
-    horse_rating = BackgroundBox(Rating(rating))
-    # print(image)
+    image = None
+    while image is None:
+        image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY)
+        try:
+            horse_sprite = Image(SOURCE_DIRECTORY / image, window)
+            horse_rating = Rating(rating)
+        except pyglet.image.codecs.ImageDecodeException:
+            print(f'Failed to load {image}')
+            image = None
 
 
-timer = Timer(11, at_zero=get_new_image)
+timer = Timer(TIMER_DURATION, at_zero=get_new_image)
 timer.start()
 timer_button = BackgroundBox(pyglet.text.Label(
     '0:00',
     font_name='Times New Roman',
     font_size=FONT_SIZE,
-    color=FONT_COLOR,
+    color=FONT_COLOR_WHITE,
     x=5, y=5,
     anchor_x='right',
     anchor_y='top',
@@ -294,12 +310,13 @@ def on_draw():
     pre_timer_button_draw()
     timer_button.draw()
 
+    update_window_button()
     window_button.draw()
 
     pre_refresh_button_draw()
     refresh_button.draw()
 
-    horse_rating.object.update(window)
+    horse_rating.update(window)
     horse_rating.draw()
 
 
@@ -313,7 +330,7 @@ def on_mouse_press(x, y, button, modifiers):
         get_new_image()
         timer.reset()
     if is_within(x, y, horse_rating):
-        horse_rating.object.on_click(x, y, button, modifiers)
+        horse_rating.on_click(x, y, button, modifiers)
 
 
 get_new_image()
