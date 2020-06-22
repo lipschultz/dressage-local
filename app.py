@@ -1,4 +1,3 @@
-import random
 import sqlite3
 from pathlib import Path
 
@@ -13,7 +12,7 @@ FONT_COLOR_FAILURE = (139, 0, 0, 168)
 FONT_SIZE = 16
 
 DATABASE_URL = 'dressage.sqlite'
-SOURCE_DIRECTORY = Path('/media/michael/OS/Users/Michael/Desktop/Backup-Organized/horses/ready')
+SOURCE_DIRECTORY = Path('images')
 
 window = pyglet.window.Window(fullscreen=PRODUCTION, caption='Dressage')
 db = sqlite3.connect(DATABASE_URL,
@@ -263,7 +262,6 @@ def get_new_image():
     global horse_sprite
     global horse_rating
     image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY)
-    image = random.choice(['Rachel/IMG_2392-mod.JPG', 'tbp6f3yv69s21.jpg'])
     horse_sprite = Image(SOURCE_DIRECTORY / image, window)
     horse_rating = BackgroundBox(Rating(rating))
     # print(image)
