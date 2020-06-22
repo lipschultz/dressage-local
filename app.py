@@ -134,7 +134,7 @@ class Rating:
     def __init__(self, rating):
         self.rating = rating
         self.stars = [
-            pyglet.text.Label(
+            BackgroundBox(pyglet.text.Label(
                 str(i+1),
                 font_name='Times New Roman',
                 font_size=FONT_SIZE,
@@ -142,10 +142,9 @@ class Rating:
                 x=5, y=5,
                 anchor_x='left',
                 anchor_y='top',
-            )
+            ))
             for i in range(5)
         ]
-        self.backgrounds = [BackgroundBox(s) for s in self.stars]
 
     @property
     def x(self):
@@ -175,26 +174,26 @@ class Rating:
 
     def update(self, window):
         x_offset = 5
-        for i in range(len(self.stars)):
-            self.stars[i].x = x_offset
-            x_offset += self.stars[i].content_width + 2*5
-            self.stars[i].y = window.height - 5
+        for i, star_box in enumerate(self.stars):
+            star_box.object.x = x_offset
+            x_offset += star_box.width
+            star_box.object.y = window.height - 5
             if i + 1 <= self.rating:
-                self.stars[i].color = FONT_COLOR_BLACK
-                self.backgrounds[i].color = FONT_COLOR_SUCCESS
+                star_box.object.color = FONT_COLOR_BLACK
+                star_box.color = FONT_COLOR_SUCCESS
             else:
-                self.stars[i].color = FONT_COLOR_WHITE
-                self.backgrounds[i].color = FONT_COLOR_BLACK
+                star_box.object.color = FONT_COLOR_WHITE
+                star_box.color = FONT_COLOR_BLACK
 
     def draw(self):
-        for star in self.backgrounds:
+        for star in self.stars:
             star.draw()
 
     def on_click(self, x, y, button, modifiers):
         for star in self.stars:
             if is_within(x, y, star):
                 file_reference = horse_sprite.filepath.relative_to(SOURCE_DIRECTORY)
-                rating = int(star.text)
+                rating = int(star.object.text)
                 print(f'Recording {rating} stars for {file_reference}')
                 select_image.record_rating(db, str(file_reference), rating)
                 self.rating = rating
@@ -273,11 +272,15 @@ def pre_refresh_button_draw():
 def get_new_image():
     global horse_sprite
     global horse_rating
-    image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY)
-    horse_sprite = Image(SOURCE_DIRECTORY / image, window)
-    rating = 3
-    horse_rating = BackgroundBox(Rating(rating))
-    # print(image)
+    image = None
+    while image is None:
+        image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY)
+        try:
+            horse_sprite = Image(SOURCE_DIRECTORY / image, window)
+            horse_rating = Rating(rating)
+        except pyglet.image.codecs.ImageDecodeException:
+            print(f'Failed to load {image}')
+            image = None
 
 
 timer = Timer(TIMER_DURATION, at_zero=get_new_image)
@@ -313,7 +316,7 @@ def on_draw():
     pre_refresh_button_draw()
     refresh_button.draw()
 
-    horse_rating.object.update(window)
+    horse_rating.update(window)
     horse_rating.draw()
 
 
@@ -327,7 +330,7 @@ def on_mouse_press(x, y, button, modifiers):
         get_new_image()
         timer.reset()
     if is_within(x, y, horse_rating):
-        horse_rating.object.on_click(x, y, button, modifiers)
+        horse_rating.on_click(x, y, button, modifiers)
 
 
 get_new_image()
