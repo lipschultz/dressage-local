@@ -10,13 +10,17 @@ def filename_to_probability(filename, ratings_map):
     return 0 if rating == 1 else 2**rating
 
 
-def select_random_horse(cursor, source_directory, file_extensions=IMG_EXTENSIONS):
+def select_random_horse(cursor, source_directory, file_extensions=IMG_EXTENSIONS, max_byte_size=1_000_000, only_unrated=False):
     file_extensions = [e.lower() for e in file_extensions]
     cursor = cursor.execute('SELECT file_reference, rating FROM ratings')
     ratings_map = {r['file_reference']: r['rating'] for r in cursor}
 
     image_directory = Path(source_directory)
-    images = [f.relative_to(image_directory) for f in image_directory.rglob('*') if f.suffix.lower() in file_extensions]
+    images = [f.relative_to(image_directory) for f in image_directory.rglob('*') if f.suffix.lower() in file_extensions and f.stat().st_size <= max_byte_size]
+    if only_unrated:
+        unrated_images = [f for f in images if str(f) not in ratings_map]
+        if len(unrated_images):
+            images = unrated_images
     ratings = [filename_to_probability(f, ratings_map) for f in images]
     total_rating = sum(ratings)
     ratings_distr = [r / total_rating for r in ratings]
