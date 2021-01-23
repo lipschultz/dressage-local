@@ -5,7 +5,7 @@ import pyglet
 
 import select_image
 
-PRODUCTION = False
+PRODUCTION = True
 FONT_COLOR_WHITE = (255, 255, 255, 127)
 FONT_COLOR_BLACK = (0, 0, 0, 127)
 FONT_COLOR_SUCCESS = (243, 229, 171, 168)
@@ -273,14 +273,18 @@ def get_new_image():
     global horse_sprite
     global horse_rating
     image = None
+    n_failures = 0
     while image is None:
-        image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY)
+        only_unrated = n_failures < 5
+        image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY, only_unrated=only_unrated)
         try:
+            print(SOURCE_DIRECTORY / image)
             horse_sprite = Image(SOURCE_DIRECTORY / image, window)
             horse_rating = Rating(rating)
-        except pyglet.image.codecs.ImageDecodeException:
-            print(f'Failed to load {image}')
+        except (pyglet.image.codecs.ImageDecodeException, pyglet.gl.lib.GLException) as ex:
+            print(f'Failed to load {image}: {ex}')
             image = None
+            n_failures += 1
 
 
 timer = Timer(TIMER_DURATION, at_zero=get_new_image)
