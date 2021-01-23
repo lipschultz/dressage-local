@@ -15,4 +15,4 @@ python scripts/clean_files.py dressage.sqlite $LOCAL_IMAGE_ROOT_DIRECTORY/ready/
 
 python scripts/remove_rated.py dressage.sqlite $REMOTE_IMAGE_DIRECTORY --verbose
 
-python scripts/send_files.py $LOCAL_IMAGE_ROOT_DIRECTORY/ready/ $REMOTE_IMAGE_DIRECTORY -v
+python scripts/send_files.py $LOCAL_IMAGE_ROOT_DIRECTORY/ready/ $REMOTE_IMAGE_DIRECTORY -v --replace-existing --resize-over 1048576
