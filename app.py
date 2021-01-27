@@ -14,6 +14,7 @@ FONT_SIZE = 24
 TIMER_DURATION = 7 * 60
 
 DATABASE_URL = 'dressage.sqlite'
+DATABASE_TABLE = 'ratings2'
 SOURCE_DIRECTORY = Path('images')
 
 window = pyglet.window.Window(fullscreen=PRODUCTION, caption='Dressage')
@@ -195,7 +196,7 @@ class Rating:
                 file_reference = horse_sprite.filepath.relative_to(SOURCE_DIRECTORY)
                 rating = int(star.object.text)
                 print(f'Recording {rating} stars for {file_reference}')
-                select_image.record_rating(db, str(file_reference), rating)
+                select_image.record_rating(db, str(file_reference), rating, DATABASE_TABLE)
                 self.rating = rating
                 break
 
@@ -276,7 +277,7 @@ def get_new_image():
     n_failures = 0
     while image is None:
         only_unrated = n_failures < 5
-        image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY, only_unrated=only_unrated)
+        image, rating = select_image.select_random_horse(db, SOURCE_DIRECTORY, table_name=DATABASE_TABLE, only_unrated=only_unrated)
         try:
             print(SOURCE_DIRECTORY / image)
             horse_sprite = Image(SOURCE_DIRECTORY / image, window)
